@@ -510,6 +510,73 @@
     }
 	</script>
 	
+	<!-- SHADER: texture per fragment -->
+	<!-- texture shader -->
+	<script id="vertex_texture_diffus" type="x-shader/x-vertex">
+	// vertex shader
+	// ------------------------------------------------------
+	// texture shader per fragment 
+	// ------------------------------------------------------
+
+	// attributes inputs  (vertex arrays)
+		attribute vec3 aVertexPosition;
+		attribute vec2 aVertexTexCoord;
+		attribute vec3 aVertexNormal;
+		
+	//point light ie omni dir:  location, color
+		uniform vec3 uPointLightPosition0;
+		uniform vec3 uPointLightColor0;
+
+	// uniform matrices
+		uniform mat4 uMVMatrix;
+		uniform mat4 uPMatrix;
+		uniform mat3 uNMatrix;
+
+	// output
+		varying vec2 vTextureCoord;
+		varying vec3 vNormal;
+		varying vec4 vPosition;
+
+
+    void main(void) {
+		vPosition = uMVMatrix * vec4(aVertexPosition, 1.0);
+        gl_Position = uPMatrix * vPosition;
+        vTextureCoord = aVertexTexCoord;
+		vNormal = aVertexNormal;
+    }
+	</script>
+	<script id="frag_texture_diffus" type="x-shader/x-fragment">
+	#ifdef GL_ES
+		precision highp float;
+	#endif
+	// fragment shader
+	// ------------------------------------------------------
+	// texture shader per fragment 
+	// ------------------------------------------------------
+
+    varying vec2 vTextureCoord;
+	varying vec3 vNormal;
+	varying vec4 vPosition;
+	
+    uniform sampler2D uSampler0;
+	
+	//point light ie omni dir:  location, color
+	uniform vec3 uPointLightPosition0;
+	uniform vec3 uPointLightColor0;
+	
+	float Kd = 1.0;
+
+    void main(void) {
+		vec3 lightDirection = normalize(uPointLightPosition0 - vPosition.xyz);
+		
+		vec3 normal = normalize(vNormal);
+		
+		float diffuseLightWeight = max(dot(normal, lightDirection), 0.0);
+		vec3 lightColor = Kd*diffuseLightWeight*texture2D(uSampler0, vTextureCoord).xyz;
+        gl_FragColor = vec4(lightColor,1.0);
+    }
+	</script>
+	
 	<!-- SHADER: wave vertex -->
 	<!-- wave shader -->
 	<script id="vertex_wave" type="x-shader/x-vertex">
@@ -678,6 +745,9 @@
 		
 		textProgNormal 	= new atomicGLShader("texture_normal",agl,"frag_texture_normal","vertex_texture_normal",2,1);
 		textProgNormalId= agl.pushProgram(textProgNormal);
+		
+		textProgDiffus	= new atomicGLShader("texture_diffus",agl,"frag_texture_diffus","vertex_texture_diffus",1,1);
+		textProgDiffusId= agl.pushProgram(textProgDiffus);
 
 		wtextProg 		= new atomicGLwaveShader("wave_texture", agl,"frag_texture", "vertex_wave" ,1,0);
 		wtextProgId		= agl.pushProgram(wtextProg);
@@ -702,29 +772,56 @@
 		house3wood.initGLBuffers(agl);
 		
 		// bridge
-		bridge1stone.pushTexture(mur_pierre1); 	bridge1stone.initGLBuffers(agl);
-		bridge1top.pushTexture(pave2); 			bridge1top.initGLBuffers(agl);
+		bridge1stone.pushTexture(mur_pierre1);
+		bridge1stone.initGLBuffers(agl);
+		
+		bridge1top.pushTexture(pave2);
+		bridge1top.initGLBuffers(agl);
 		
 		// ground
-		ground0top.pushTexture(pave2); 			ground0top.initGLBuffers(agl);
-		ground0edge.pushTexture(pierre2); 		ground0edge.initGLBuffers(agl);
-		river1.pushTexture(eau1); 				river1.initGLBuffers(agl);
+		ground0top.pushTexture(pave2);
+		ground0top.initGLBuffers(agl);
+		
+		ground0edge.pushTexture(pierre2);
+		ground0edge.initGLBuffers(agl);
+		
+		river1.pushTexture(eau1);
+		river1.initGLBuffers(agl);
 		
 		// tower
-		tower1base.pushTexture(pierre3);		tower1base.initGLBuffers(agl);
-		tower1mur.pushTexture(mur_pierre1);		tower1mur.initGLBuffers(agl);
-		tower1parape.pushTexture(bois1);		tower1parape.initGLBuffers(agl);
-		tower1sol.pushTexture(sol3);			tower1sol.initGLBuffers(agl);
-		tower1toit.pushTexture(toit1);			tower1toit.initGLBuffers(agl);
+		tower1base.pushTexture(pierre3);
+		tower1base.initGLBuffers(agl);
+		
+		tower1mur.pushTexture(mur_pierre1);
+		tower1mur.initGLBuffers(agl);
+		
+		tower1parape.pushTexture(bois1);
+		tower1parape.initGLBuffers(agl);
+		
+		tower1sol.pushTexture(sol3);
+		tower1sol.initGLBuffers(agl);
+		
+		tower1toit.pushTexture(toit1);
+		tower1toit.pushTexture(toit1_normalMap);
+		tower1toit.initGLBuffers(agl);
 		
 		// wall
-		wall2base.pushTexture(pierre3) ;		wall2base.initGLBuffers(agl);
-		wall2stone.pushTexture(mur_pierre1);	wall2stone.initGLBuffers(agl);
-		wall2wood.pushTexture(bois1);			wall2wood.initGLBuffers(agl);
-		wall2roof.pushTexture(toit1);			wall2roof.initGLBuffers(agl);
+		wall2base.pushTexture(pierre3);
+		wall2base.initGLBuffers(agl);
+		
+		wall2stone.pushTexture(mur_pierre1);
+		wall2stone.initGLBuffers(agl);
+		
+		wall2wood.pushTexture(bois1);
+		wall2wood.initGLBuffers(agl);
+		
+		wall2roof.pushTexture(toit1);
+		wall2roof.pushTexture(toit1_normalMap);
+		wall2roof.initGLBuffers(agl);
 		
 		// 	water
-		water.pushTexture(eau1) ;water.initGLBuffers(agl);
+		water.pushTexture(eau1);
+		water.initGLBuffers(agl);
 
 		// start the animation
 		nextFrame();
@@ -759,10 +856,10 @@
 					// position & orientation
 					ams.mvTranslate(-25.0,0,-10);
 					// draw
-					tower1base.draw(agl,ams,textProgNormalId);
-					tower1mur.draw(agl,ams,textProgNormalId);
-					tower1parape.draw(agl,ams,textProgNormalId);
-					tower1sol.draw(agl,ams,textProgNormalId);
+					tower1base.draw(agl,ams,textProgDiffusId);
+					tower1mur.draw(agl,ams,textProgDiffusId);
+					tower1parape.draw(agl,ams,textProgDiffusId);
+					tower1sol.draw(agl,ams,textProgDiffusId);
 					tower1toit.draw(agl,ams,textProgNormalId);
 					// wall
 					// push matrix
@@ -770,16 +867,16 @@
 						// position & orientation
 						ams.mvTranslate(4.4,0,-1.0);
 						// draw
-						wall2base.draw(agl,ams,textProgNormalId);
-						wall2stone.draw(agl,ams,textProgNormalId);
-						wall2wood.draw(agl,ams,textProgNormalId);
+						wall2base.draw(agl,ams,textProgDiffusId);
+						wall2stone.draw(agl,ams,textProgDiffusId);
+						wall2wood.draw(agl,ams,textProgDiffusId);
 						wall2roof.draw(agl,ams,textProgNormalId);
 						// next part
 						ams.mvTranslate(19.5,0,0.0);
 						// draw
-						wall2base.draw(agl,ams,textProgNormalId);
-						wall2stone.draw(agl,ams,textProgNormalId);
-						wall2wood.draw(agl,ams,textProgNormalId);
+						wall2base.draw(agl,ams,textProgDiffusId);
+						wall2stone.draw(agl,ams,textProgDiffusId);
+						wall2wood.draw(agl,ams,textProgDiffusId);
 						wall2roof.draw(agl,ams,textProgNormalId);
 					// pop matrix
 					ams.mvPopMatrix();
@@ -800,9 +897,9 @@
 			
 				// ground
 				// ----------------------------
-				ground0top.draw(agl,ams,textProgNormalId);
-				ground0edge.draw(agl,ams,textProgNormalId);
-				river1.draw(agl,ams,textProgNormalId);
+				ground0top.draw(agl,ams,textProgDiffusId);
+				ground0edge.draw(agl,ams,textProgDiffusId);
+				river1.draw(agl,ams,textProgDiffusId);
 
 				
 				// house3 and bridge
@@ -813,12 +910,12 @@
 					ams.mvTranslate(0.0,0.1,0.0);
 
 					// draw
-					house3.draw(agl,ams,textProgNormalId);
+					house3.draw(agl,ams,textProgDiffusId);
 					house3roof.draw(agl,ams,textProgNormalId);
-					house3wood.draw(agl,ams,textProgNormalId);
+					house3wood.draw(agl,ams,textProgDiffusId);
 					
-					bridge1stone.draw(agl,ams,textProgNormalId);
-					bridge1top.draw(agl,ams,textProgNormalId);
+					bridge1stone.draw(agl,ams,textProgDiffusId);
+					bridge1top.draw(agl,ams,textProgDiffusId);
 					
 					// pop matrix
 				ams.mvPopMatrix();
