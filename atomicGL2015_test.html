@@ -1,0 +1,287 @@
+<html>
+<head>
+	<title>atomicGL DEBUG </title>
+	<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+
+	<script type="text/javascript" src="gltp1_fichiers/glMatrix-0.js"></script>
+	<script type="text/javascript" src="gltp1_fichiers/webgl-utils.js"></script>
+
+	<!-- ATOMICGL ENGINE -->
+	<!-- load "modules" -->
+	<script type="text/javascript" src="atomicGLContext.js"></script>
+	<script type="text/javascript" src="atomicGLMatrixStack.js"></script>
+	
+	<script type="text/javascript" src="atomicGLClock.js"></script>
+
+	<script type="text/javascript" src="atomicGLShader.js"></script>
+	<script type="text/javascript" src="atomicGLwaveShader.js"></script>
+
+	<script type="text/javascript" src="atomicGLCube.js"></script>
+	<script type="text/javascript" src="atomicGLxyPlane.js"></script>
+	<script type="text/javascript" src="atomicGLxzPlane.js"></script>
+	<script type="text/javascript" src="atomicGLSphere.js"></script>
+	
+	<script type="text/javascript" src="atomicGLDisk.js"></script>
+	
+	<script type="text/javascript" src="atomicGLwaterShader.js"></script>
+
+
+	<!-- SHADER: wave vertex -->
+	<!-- wave shader -->
+	<script id="vertex_water" type="x-shader/x-vertex" src="waterShader.gl">
+	// attributes inputs  (vertex arrays)
+attribute vec3 aVertexPosition;
+attribute vec3 aVertexNormal;
+attribute vec3 aVertexColor;
+
+/**
+ *	waves = A*sin(w*u+p*t)
+ *	[0] = A = amplitude
+ *	[1] = w = omega
+ *	[2] = p = phi
+ *	u = x | y (depending on the wave's direction)
+**/
+uniform vec3 uSinParamX1;
+uniform vec3 uSinParamX2;
+uniform vec3 uSinParamX3;
+uniform vec3 uSinParamX4;
+
+uniform vec3 uSinParamY1;
+uniform vec3 uSinParamY2;
+uniform vec3 uSinParamY3;
+uniform vec3 uSinParamY4;
+
+//uniforms
+uniform float uTime;
+
+// uniform matrices
+uniform mat4 uMVMatrix;
+uniform mat4 uPMatrix;
+uniform mat3 uNMatrix;
+
+//outputs
+varying vec4 vPosition;
+varying vec3 vNormal;
+varying vec3 vColor;
+
+void main(void)
+{
+	/*	here :
+	 *	(x,y) = position in the plane
+	 *	z = elevation above the plane
+	 */
+	float posX = aVertexPosition.x;
+	float posY = aVertexPosition.z;
+	
+	// X waves
+	float X1u = uSinParamX1.y * posX + uSinParamX1.z * uTime;
+	float X2u = uSinParamX2.y * posX + uSinParamX2.z * uTime;
+	float X3u = uSinParamX3.y * posX + uSinParamX3.z * uTime;
+	float X4u = uSinParamX4.y * posX + uSinParamX4.z * uTime;
+	
+	float X1 = uSinParamX1.x * sin(X1u);
+	float X2 = uSinParamX2.x * sin(X2u);
+	float X3 = uSinParamX3.x * sin(X3u);
+	float X4 = uSinParamX4.x * sin(X4u);
+	
+	float ZX = X1+X2+X3+X4;
+	
+	// Y waves
+	float Y1u = uSinParamY1.y * posY + uSinParamY1.z * uTime;
+	float Y2u = uSinParamY2.y * posY + uSinParamY2.z * uTime;
+	float Y3u = uSinParamY3.y * posY + uSinParamY3.z * uTime;
+	float Y4u = uSinParamY4.y * posY + uSinParamY4.z * uTime;
+	
+	float Y1 = uSinParamY1.x * sin(Y1u);
+	float Y2 = uSinParamY2.x * sin(Y2u);
+	float Y3 = uSinParamY3.x * sin(Y3u);
+	float Y4 = uSinParamY4.x * sin(Y4u);
+	
+	float ZY = Y1+Y2+Y3+Y4;
+	
+	// end
+	float Z = ZX + ZY;
+	
+	vPosition = uMVMatrix * vec4(aVertexPosition+vec3(0.0,50.0*Z,0.0), 1.0);
+	gl_Position = uPMatrix * vPosition;
+	
+	vNormal = aVertexNormal;//uNMatrix * (vec3(vNormal.x,0.0,vNormal.z));//+dnormal);
+	
+	vColor = aVertexColor;
+}
+	</script>
+<script id="frag_diffuse" type="x-shader/x-fragment">
+	#ifdef GL_ES
+		precision highp float;
+	#endif
+
+	// fragment shader
+	// ------------------------------------------------------
+	// diffuse shader
+	// per fragment 
+	// lights nb: 1
+	// ------------------------------------------------------
+
+	// varying input (output of the vertex shader)
+		varying vec4 vPosition;
+		varying vec3 vNormal;
+		varying vec3 vColor;
+		
+	// lights
+		// ambient
+		uniform vec3 uAmbientColor;
+
+		//point light ie omni dir:  location, color
+		uniform vec3 uPointLightPosition0;
+		uniform vec3 uPointLightColor0;
+
+	// local constant
+		// Kd: diffuse coeff
+		float Kd = 1.0 ;
+	
+	// main
+    void main(void) {	
+		// light direction
+		vec3 lightDirection = normalize(uPointLightPosition0 - vPosition.xyz);
+		// eye direction
+		vec3 eyeDirection = normalize(-vPosition.xyz);
+
+		// normalize normal
+		vec3 normal = normalize(vNormal);
+		//  diffuse term
+		float diffuseLightWeight = max(dot(normal, lightDirection), 0.0);
+			
+		// light color
+         vec3 lightColor = uAmbientColor + Kd*diffuseLightWeight*uPointLightColor0 *vColor  ;
+
+        gl_FragColor = vec4(lightColor,1.0);
+    }
+</script>
+
+
+
+	<!-- ATOMICGL ENGINE -->
+	<!-- create objects -->
+	<!-- wegGLStart function (required) -->
+	<script type="text/javascript">
+	//------------------------------------------------------------------------------
+
+	// OpenGL context
+	var agl = new atomicGLContext();
+	
+	// clock
+	var sceneClock =new atomicGLClock() ;
+
+	// matrix stack
+	var ams =new atomicGLMatrixStack();
+
+	// shader and id
+	// diffus
+	var diffusProg ;
+	var diffusProgId ;
+
+
+	// cube 
+	var disk 		= new atomicGLDisk("disk",5,64,64);
+	
+	// animation
+	var colorCubeYangle = 0.0 ;
+	var waveTime = 0.0 ;
+	
+
+	//webGLStart
+	function webGLStart() {
+	// init
+	// -----------------------------
+		// recover penGL canvas 
+		var canvas = document.getElementById("oglcanvas");
+
+		// init OpenGL context
+		agl.initGL(canvas,[1.0,1.0,1.0]);
+		
+		// light
+		agl.pushLight([5.0,5.0,-10.0],[1.0,1.0,1.0]); // position, color
+		agl.ambientLightColor = [0.01,0.01,0.2];	// color
+
+		// init Matrix Stack
+		ams.initMatrix(agl,45); // fov = 45 degrees
+
+		// load shaders
+		diffusProg 		= new atomicGLwaterShader("water", agl,"frag_diffuse", "vertex_water" ,false,1);
+		diffusProg.X1 = [1.0,1.0,1.0];
+		diffusProg.X2 = [1.0,1.0,1.0];
+		diffusProg.X3 = [1.0,1.0,1.0];
+		diffusProg.X4 = [1.0,1.0,1.0];
+		
+		diffusProg.Y1 = [1.0,1.0,1.0];
+		diffusProg.Y2 = [1.0,1.0,1.0];
+		diffusProg.Y3 = [1.0,1.0,1.0];
+		diffusProg.Y4 = [1.0,1.0,1.0];
+
+		// push shader in context
+		diffusProgId 		= agl.pushProgram(diffusProg);
+
+		// sphere
+		//disk.setFaceColor("All",[0.0,0.0,1.0]);
+		disk.initGLBuffers(agl);
+	
+		// start the animation
+		nextFrame();
+	}
+		
+	// draw
+	// -----------------------------
+	function sceneDraw(){
+		agl.initDraw();
+
+		// global transform
+		// ------------------------------
+		// push matrix
+		ams.mvPushMatrix();
+		// position & orientation	
+
+			ams.mvTranslate(0,-2,-20);
+			ams.mvRotate(20,[1,0,0]);
+			//ams.mvTranslate(0,-15,-30);
+		
+			// sphere
+			// ---------------------------------------
+			// push matrix
+			ams.mvPushMatrix();
+				// position & orientation
+				ams.mvTranslate(0.0,0.5,0);
+				// draw
+				disk.draw(agl,ams,diffusProgId);
+			// pop matrix
+			ams.mvPopMatrix();
+			
+		// ---------------------------------------	
+		// pop matrix
+		ams.mvPopMatrix();
+	}
+	
+	// nextFrame
+	// -----------------------------
+    function nextFrame() {
+        requestAnimFrame(nextFrame);
+        sceneDraw();
+        animate();
+    }
+    
+    // animate
+    // ------------------------------
+    function animate(){
+    	// increase time
+    	sceneClock.tick() ;
+    	colorCubeYangle = colorCubeYangle + 0.1*sceneClock.get();
+    	waveTime = waveTime + 0.005*sceneClock.get();
+    }
+
+</script>
+</head>
+
+<body onload="webGLStart();">
+	<br>
+    <canvas id="oglcanvas" style="border: none;" width="800" height="600"></canvas>
+	<br>
+</body></html>
