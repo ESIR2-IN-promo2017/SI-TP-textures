@@ -500,11 +500,11 @@
     void main(void) {
 		vec3 lightDirection = normalize(uPointLightPosition0 - vPosition.xyz);
 		
-		//vec3 normal = normalize(texture2D(uSampler1,vTextureCoord).xyz);
+		vec3 normal = normalize(texture2D(uSampler1,vTextureCoord).xyz * vNormal);
 		
-		vec3 normal = normalize(vNormal);
+		//vec3 normal = normalize(vNormal);
 		
-		float diffuseLightWeight = max(dot(normal, lightDirection), 0.0);
+		float diffuseLightWeight = 2.0*max(dot(normal, lightDirection), 0.0)-1.0;
 		vec3 lightColor = Kd*diffuseLightWeight*texture2D(uSampler0, vTextureCoord).xyz;
         gl_FragColor = vec4(lightColor,1.0);
     }
